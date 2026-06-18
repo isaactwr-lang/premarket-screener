@@ -136,13 +136,36 @@ class YFinanceConnector:
         logger.info(f"Got volume baseline for {len(result)}/{len(tickers)} tickers")
         return result
 
+    _SP500_URL = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+
+    # Emergency fallback — only used if Wikipedia is unreachable
+    _FALLBACK_UNIVERSE = [
+        "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "JPM",
+        "JNJ", "V", "WMT", "PG", "MA", "HD", "MCD", "DIS", "INTC", "MU",
+        "AMD", "NFLX", "CRM", "ADBE", "CSCO", "PEP", "COST", "QCOM", "AVGO",
+        "BA", "CAT", "LMT", "RTX", "GE", "TXN", "GILD", "ASML", "ORCL",
+        "GS", "MS", "BAC", "WFC", "C", "UNH", "PFE", "ABBV", "LLY", "MRK",
+        "XOM", "CVX", "SQ", "ROKU", "SNOW", "DDOG", "NET", "CRWD", "PLTR",
+        "AI", "ARM", "IONQ", "SOFI", "SMCI", "RKLB", "MSTR", "COIN",
+    ]
+
     def _default_universe(self) -> List[str]:
-        return [
-            "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "JPM",
-            "JNJ", "V", "WMT", "PG", "MA", "HD", "MCD", "DIS", "INTC",
-            "AMD", "NFLX", "CRM", "ADBE", "CSCO", "PEP", "COST", "QCOM",
-            "BA", "CAT", "LMT", "RTX", "GE", "TXN", "GILD", "ASML",
-            "SQ", "ROKU", "DASH", "SPOT", "SNOW", "DDOG", "NET", "CRWD",
-            "PINS", "RBLX", "COIN", "HOOD", "GME", "NIO", "BABA", "UPST",
-            "AI", "PLTR", "ARM", "IONQ", "SOFI", "SMCI", "RKLB", "MSTR",
-        ]
+        """Fetch S&P 500 tickers from Wikipedia. Falls back to a hardcoded list on failure."""
+        try:
+            import pandas as pd
+            from io import StringIO
+            resp = requests.get(
+                self._SP500_URL,
+                headers={"User-Agent": "Mozilla/5.0 (compatible; premarket-screener/1.0)"},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            tables = pd.read_html(StringIO(resp.text), attrs={"id": "constituents"})
+            tickers = tables[0]["Symbol"].tolist()
+            # Wikipedia uses dots for share classes (e.g. BRK.B) — Yahoo uses dashes
+            tickers = [t.replace(".", "-") for t in tickers]
+            logger.info(f"Loaded {len(tickers)} tickers from S&P 500 Wikipedia list")
+            return tickers
+        except Exception as e:
+            logger.warning(f"Failed to fetch S&P 500 from Wikipedia ({e}) — using fallback universe")
+            return self._FALLBACK_UNIVERSE
