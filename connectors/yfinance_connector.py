@@ -149,8 +149,15 @@ class YFinanceConnector:
         "AI", "ARM", "IONQ", "SOFI", "SMCI", "RKLB", "MSTR", "COIN",
     ]
 
+    _STATIC_SP500_PATH = Path(__file__).parent.parent / "data" / "sp500_tickers.txt"
+
     def _default_universe(self) -> List[str]:
-        """Fetch S&P 500 tickers from Wikipedia. Falls back to a hardcoded list on failure."""
+        """
+        Fetch S&P 500 tickers from Wikipedia.
+        Falls back to the committed data/sp500_tickers.txt if Wikipedia is
+        unreachable (common in CI/cloud environments), then to a small
+        hardcoded emergency list as a last resort.
+        """
         try:
             import pandas as pd
             from io import StringIO
@@ -168,6 +175,15 @@ class YFinanceConnector:
             self.sp500_tickers = set(tickers)
             return tickers
         except Exception as e:
-            logger.warning(f"Failed to fetch S&P 500 from Wikipedia ({e}) — using fallback universe")
+            logger.warning(f"Wikipedia unavailable ({e}) — trying static fallback file")
+
+        try:
+            tickers = self._STATIC_SP500_PATH.read_text().splitlines()
+            tickers = [t.strip() for t in tickers if t.strip()]
+            logger.info(f"Loaded {len(tickers)} tickers from static fallback file")
+            self.sp500_tickers = set(tickers)
+            return tickers
+        except Exception as e:
+            logger.warning(f"Static fallback file unavailable ({e}) — using hardcoded emergency list")
             self.sp500_tickers = set(self._FALLBACK_UNIVERSE)
             return self._FALLBACK_UNIVERSE
