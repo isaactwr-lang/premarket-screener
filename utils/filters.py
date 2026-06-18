@@ -3,7 +3,7 @@ from typing import List, Dict, Optional
 import logging
 import time
 
-import yfinance as yf
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -27,45 +27,51 @@ def _cap_tier_from_market_cap(market_cap: int) -> str:
     return "micro"
 
 
-def _fetch_market_cap(ticker: str, retries: int = 2, delay: float = 2.0) -> Optional[int]:
-    """Return market cap in dollars, or None if unavailable after retries."""
-    for attempt in range(retries):
-        try:
-            mc = yf.Ticker(ticker).fast_info.market_cap
-            if mc and mc > 0:
-                return int(mc)
-        except Exception:
-            pass
-        if attempt < retries - 1:
-            time.sleep(delay)
-    return None
+_CHART_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    "Accept": "application/json",
+}
 
 
-def enrich_with_market_cap(stocks: List[Dict]) -> None:
+def _fetch_market_cap(ticker: str) -> Optional[int]:
+    """Return market cap in dollars via Yahoo chart API, or None if unavailable."""
+    try:
+        r = requests.get(
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
+            headers=_CHART_HEADERS,
+            params={"interval": "1d", "range": "1d"},
+            timeout=10,
+        )
+        if r.status_code != 200:
+            return None
+        mc = r.json()["chart"]["result"][0]["meta"].get("marketCap")
+        return int(mc) if mc and mc > 0 else None
+    except Exception:
+        return None
+
+
+def enrich_with_market_cap(stocks: List[Dict], sp500_tickers: Optional[set] = None) -> None:
     """
     Add 'market_cap' and 'cap_tier' to each stock dict in-place.
-    If yfinance is unavailable (rate-limited), tier is set to 'unknown'
-    rather than incorrectly defaulting to 'micro'.
+
+    S&P 500 members are classified as 'large' without an API call — S&P 500
+    membership requires $18B+ market cap so the tier is unambiguous.
+    For non-S&P-500 tickers the Yahoo chart API is tried; failures get 'unknown'.
     """
-    consecutive_failures = 0
     for stock in stocks:
         ticker = stock.get("ticker", "")
-
-        if consecutive_failures >= 3:
-            stock["market_cap"] = 0
-            stock["cap_tier"] = "unknown"
+        if sp500_tickers and ticker in sp500_tickers:
+            stock["market_cap"] = 0  # exact value not needed
+            stock["cap_tier"] = "large"
             continue
-
         mc = _fetch_market_cap(ticker)
         if mc:
             stock["market_cap"] = mc
             stock["cap_tier"] = _cap_tier_from_market_cap(mc)
-            consecutive_failures = 0
         else:
             stock["market_cap"] = 0
             stock["cap_tier"] = "unknown"
-            consecutive_failures += 1
-            logger.debug(f"Market cap unavailable for {ticker} (rate-limited?)")
+            logger.debug(f"Market cap unavailable for {ticker}")
 
 
 def enrich_with_rvol(stocks: List[Dict], yf_connector, in_premarket: bool = True) -> None:
@@ -101,40 +107,59 @@ def enrich_with_rvol(stocks: List[Dict], yf_connector, in_premarket: bool = True
             stock["rvol_basis"] = "live"
 
 
-def filter_gappers(stocks: List[Dict], gap_threshold: float = 5.0,
-                   min_rvol: float = 3.0, top_n: int = 20) -> List[Dict]:
+# For large/mega caps the gap itself is the signal — skip RVOL filter entirely
+# For smaller caps, unusual volume confirms the move is real
+_RVOL_BY_TIER = {
+    "mega":    0.0,
+    "large":   0.0,
+    "mid":     1.5,
+    "small":   3.0,
+    "micro":   3.0,
+    "unknown": 3.0,
+}
+
+
+def filter_gappers(stocks: List[Dict], gap_threshold: float = 5.0, top_n: int = 20,
+                   sp500_tickers: Optional[set] = None) -> List[Dict]:
     """
     Filter stocks by gapper criteria, enrich with market cap tier, and sort:
       primary   — cap tier (mega → large → mid → small → micro → unknown)
       secondary — gap % descending within each tier
 
-    RVOL filter only applies when a stock has an 'rvol' field set (regular session).
-    During premarket the field is absent and the filter is skipped automatically.
+    RVOL threshold is tiered by market cap: large/mega caps use a lower bar
+    since their average daily volume is so high that 3x is rarely reached.
+    RVOL filter is skipped entirely when rvol is None (premarket proxy unavailable).
     """
-    filtered = []
-
+    # First pass: gap filter only
+    gap_passed = []
     for stock in stocks:
         try:
-            gap_pct = float(stock.get("gap_pct", 0))
-            rvol = stock.get("rvol", None)
-
-            if gap_pct < gap_threshold:
-                continue
-
-            # Only apply RVOL filter when we have a measured value
-            if rvol is not None and rvol < min_rvol:
-                continue
-
-            filtered.append(stock)
+            if float(stock.get("gap_pct", 0)) >= gap_threshold:
+                gap_passed.append(stock)
         except (ValueError, TypeError) as e:
             logger.warning(f"Error processing stock {stock.get('ticker', 'UNKNOWN')}: {e}")
-            continue
+
+    if not gap_passed:
+        return []
+
+    # Enrich with market cap before RVOL filter so we can apply tier-based thresholds
+    logger.info(f"Fetching market cap for {len(gap_passed)} gappers...")
+    enrich_with_market_cap(gap_passed, sp500_tickers=sp500_tickers)
+
+    # Second pass: tier-aware RVOL filter
+    filtered = []
+    for stock in gap_passed:
+        rvol = stock.get("rvol", None)
+        if rvol is not None:
+            tier = stock.get("cap_tier", "unknown")
+            min_rvol = _RVOL_BY_TIER.get(tier, 3.0)
+            if rvol < min_rvol:
+                logger.debug(f"Filtered {stock['ticker']} ({tier}): RVOL {rvol:.1f}x < {min_rvol}x threshold")
+                continue
+        filtered.append(stock)
 
     if not filtered:
         return []
-
-    logger.info(f"Fetching market cap for {len(filtered)} gappers...")
-    enrich_with_market_cap(filtered)
 
     # Stable sort: gap% descending first, then tier ascending
     filtered.sort(key=lambda x: float(x.get("gap_pct", 0)), reverse=True)

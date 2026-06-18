@@ -70,7 +70,8 @@ class GappersScreener:
         else:
             logger.info("Step 2: Regular session — enriching with live RVOL, filtering by gap > 5% and RVOL >= 3x 20-day ADV...")
         enrich_with_rvol(gap_candidates, self.yf_connector, in_premarket=in_premarket)
-        filtered_gappers = filter_gappers(gap_candidates)
+        sp500 = getattr(self.yf_connector, "sp500_tickers", None)
+        filtered_gappers = filter_gappers(gap_candidates, sp500_tickers=sp500)
 
         if not filtered_gappers:
             logger.info("No stocks met the filter criteria")

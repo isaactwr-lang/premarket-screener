@@ -165,7 +165,9 @@ class YFinanceConnector:
             # Wikipedia uses dots for share classes (e.g. BRK.B) — Yahoo uses dashes
             tickers = [t.replace(".", "-") for t in tickers]
             logger.info(f"Loaded {len(tickers)} tickers from S&P 500 Wikipedia list")
+            self.sp500_tickers = set(tickers)
             return tickers
         except Exception as e:
             logger.warning(f"Failed to fetch S&P 500 from Wikipedia ({e}) — using fallback universe")
+            self.sp500_tickers = set(self._FALLBACK_UNIVERSE)
             return self._FALLBACK_UNIVERSE
