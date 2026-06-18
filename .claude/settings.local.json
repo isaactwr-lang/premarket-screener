@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python main.py)",
+      "WebSearch",
+      "Bash(/opt/anaconda3/bin/python main.py)"
+    ]
+  }
+}

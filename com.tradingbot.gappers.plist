@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.tradingbot.gappers</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/isaacteo/Library/Mobile Documents/com~apple~CloudDocs/Resume Stuff/Coding Portfolio/Trading Bot/run_bot.sh</string>
+    </array>
+
+    <!-- Fires every day at 20:30 GMT+8; run_bot.sh skips weekends itself -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>20</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/isaacteo/Library/Mobile Documents/com~apple~CloudDocs/Resume Stuff/Coding Portfolio/Trading Bot/logs/launchd_stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/isaacteo/Library/Mobile Documents/com~apple~CloudDocs/Resume Stuff/Coding Portfolio/Trading Bot/logs/launchd_stderr.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

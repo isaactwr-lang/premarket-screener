@@ -1,0 +1,31 @@
+PREMARKET SCREENER — TERMINAL COMMANDS
+================================
+
+--- SCHEDULING (run once to activate) ---
+
+Install the schedule:
+  cp "/Users/isaacteo/Library/Mobile Documents/com~apple~CloudDocs/Resume Stuff/Coding Portfolio/Trading Bot/com.tradingbot.gappers.plist" ~/Library/LaunchAgents/
+  launchctl load ~/Library/LaunchAgents/com.tradingbot.gappers.plist
+
+Confirm it's active:
+  launchctl list | grep tradingbot
+
+Stop the schedule:
+  launchctl unload ~/Library/LaunchAgents/com.tradingbot.gappers.plist
+
+
+--- RUNNING MANUALLY ---
+
+Run the bot now:
+  cd "/Users/isaacteo/Library/Mobile Documents/com~apple~CloudDocs/Resume Stuff/Coding Portfolio/Trading Bot"
+  python main.py
+
+View today's log:
+  cat "/Users/isaacteo/Library/Mobile Documents/com~apple~CloudDocs/Resume Stuff/Coding Portfolio/Trading Bot/logs/run_$(date +%Y-%m-%d).log"
+
+
+--- SCHEDULE INFO ---
+
+Fires: every day at 8:30pm GMT+8 (= 8:30am US Eastern Time, deep in premarket)
+Skips: Saturday and Sunday (handled inside run_bot.sh)
+Logs:  Trading Bot/logs/run_YYYY-MM-DD.log
