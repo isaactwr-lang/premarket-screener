@@ -18,6 +18,7 @@ def send_results(results: List[Dict], scan_date: str, scan_time: str) -> bool:
     for chunk in _split(message):
         if not _send(token, chat_id, chunk):
             return False
+    logger.info(f"Telegram notification sent ({len(results)} gappers)")
     return True
 
 
@@ -50,15 +51,21 @@ def _format_message(results: List[Dict], scan_date: str, scan_time: str) -> str:
         rvol = stock.get("rvol")
         rvol_basis = stock.get("rvol_basis", "live")
         catalyst = stock.get("catalyst", "No news available")
+        catalyst_detail = stock.get("catalyst_detail")
 
         rvol_label = "prevRVOL" if rvol_basis == "prev_session" else "RVOL"
         rvol_str = f"  {rvol_label}: {rvol:.1f}x" if rvol is not None else ""
 
         if len(catalyst) > 120:
             catalyst = catalyst[:117] + "..."
+        if catalyst_detail and len(catalyst_detail) > 200:
+            catalyst_detail = catalyst_detail[:197] + "..."
 
         lines.append(f"• <b>{ticker}</b>  ${price:.2f}  <b>+{gap:.1f}%</b>{rvol_str}")
         lines.append(f"  <i>{catalyst}</i>")
+        if catalyst_detail:
+            lines.append(f"  {catalyst_detail}")
+        lines.append("")  # blank line between stocks
 
     return "\n".join(lines)
 

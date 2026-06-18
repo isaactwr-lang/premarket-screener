@@ -156,10 +156,21 @@ class AlpacaConnector:
             logger.warning(f"Snapshots error: {e}")
             return {}
 
-    def get_news(self, ticker: str, limit: int = 3) -> Optional[str]:
+    # Keywords that suggest a headline is about a specific price move
+    _MOVE_KEYWORDS = [
+        "surges", "jumps", "gains", "rises", "rallies", "soars", "spikes",
+        "drops", "falls", "tumbles", "slides", "plunges", "dips", "declines",
+        "upgraded", "downgraded", "beats", "misses", "raises", "cuts",
+        "earnings", "revenue", "guidance", "buyback", "dividend", "merger",
+        "acquisition", "deal", "partnership", "fda", "approval", "recall",
+        "results", "outlook", "forecast", "target", "price target",
+    ]
+
+    def get_news(self, ticker: str, limit: int = 5) -> Optional[Dict]:
         """
-        Fetch the most recent news headline for a ticker via Alpaca News API.
-        Returns the headline of the latest article, or None if unavailable.
+        Fetch the most relevant recent news for a ticker via Alpaca News API.
+        Returns {"headline": str, "detail": Optional[str]} where detail is the
+        article summary (analyst thesis, macro context, etc.), or None if unavailable.
         """
         try:
             url = f"{DATA_URL}/v1beta1/news"
@@ -177,8 +188,27 @@ class AlpacaConnector:
             if not articles:
                 return None
 
-            headline = articles[0].get("headline", "").strip()
-            return headline if headline else None
+            ticker_lower = ticker.lower()
+
+            # Score each article: +2 if ticker mentioned in headline, +1 per move keyword
+            def _score(headline: str) -> int:
+                h = headline.lower()
+                score = 2 if ticker_lower in h else 0
+                score += sum(1 for kw in self._MOVE_KEYWORDS if kw in h)
+                return score
+
+            articles = [a for a in articles if a.get("headline", "").strip()]
+            if not articles:
+                return None
+
+            best = max(articles, key=lambda a: _score(a.get("headline", "")))
+            headline = best.get("headline", "").strip()
+
+            summary = best.get("summary", "").strip()
+            # Drop summary if empty or if it's just a repeat of the headline
+            detail = summary if summary and summary.lower() != headline.lower() else None
+
+            return {"headline": headline, "detail": detail}
 
         except Exception as e:
             logger.debug(f"News API error for {ticker}: {e}")

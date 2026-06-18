@@ -83,7 +83,9 @@ class GappersScreener:
         for stock in filtered_gappers:
             ticker = stock["ticker"]
             logger.info(f"  Fetching catalyst for {ticker}...")
-            stock["catalyst"] = self.get_news_catalyst(ticker)
+            news = self.get_news_catalyst(ticker)
+            stock["catalyst"] = news["catalyst"]
+            stock["catalyst_detail"] = news["catalyst_detail"]
             time.sleep(1.5)
 
         self.results = filtered_gappers
@@ -130,23 +132,24 @@ class GappersScreener:
         logger.info(f"Found {len(gappers)} potential gappers")
         return gappers
 
-    def get_news_catalyst(self, ticker: str) -> str:
+    def get_news_catalyst(self, ticker: str) -> Dict:
         """
-        Fetch latest news headline for a ticker.
-        Tries Benzinga first; falls back to Alpaca News API if blocked.
+        Fetch the most relevant news for a ticker.
+        Tries Alpaca News API first (ticker-specific, scored by relevance);
+        falls back to Benzinga scrape if Alpaca returns nothing.
+        Returns {"catalyst": str, "catalyst_detail": Optional[str]}.
         """
+        if self.use_alpaca:
+            result = self.alpaca_connector.get_news(ticker)
+            if result:
+                return {"catalyst": result["headline"], "catalyst_detail": result.get("detail")}
+
         headline = self._scrape_benzinga(ticker)
         if headline:
-            return headline
-
-        if self.use_alpaca:
-            logger.info(f"  Benzinga blocked for {ticker}, trying Alpaca news...")
-            headline = self.alpaca_connector.get_news(ticker)
-            if headline:
-                return headline
+            return {"catalyst": headline, "catalyst_detail": None}
 
         logger.warning(f"No news found for {ticker}")
-        return "No news available"
+        return {"catalyst": "No news available", "catalyst_detail": None}
 
     # ------------------------------------------------------------------
     # Benzinga scraper
@@ -251,5 +254,8 @@ class GappersScreener:
             else:
                 rvol_str = ""
             print(f"  * {stock['ticker']} ${stock['price']:.2f} +{stock['gap_pct']:.2f}%{rvol_str} - {stock['catalyst']}")
+            if stock.get("catalyst_detail"):
+                print(f"    {stock['catalyst_detail']}")
+            print()
 
         print("\n" + "=" * 80 + "\n")
