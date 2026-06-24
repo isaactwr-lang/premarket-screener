@@ -16,7 +16,8 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import pytz
 import requests
 from bs4 import BeautifulSoup
@@ -188,12 +189,12 @@ class WeeklyRecapAgent:
 
     def summarise(self, text: str) -> str:
         logger.info("Summarising with Gemini...")
-        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction=_SUMMARY_SYSTEM,
+        client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            config=types.GenerateContentConfig(system_instruction=_SUMMARY_SYSTEM),
+            contents=text,
         )
-        response = model.generate_content(text)
         return response.text
 
     def build_email(self, summary_html: str, data: Dict, date_str: str) -> str:
