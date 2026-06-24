@@ -16,7 +16,7 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-import anthropic
+import google.generativeai as genai
 import pytz
 import requests
 from bs4 import BeautifulSoup
@@ -187,15 +187,14 @@ class WeeklyRecapAgent:
         return "\n".join(lines)
 
     def summarise(self, text: str) -> str:
-        logger.info("Summarising with Claude...")
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1500,
-            system=_SUMMARY_SYSTEM,
-            messages=[{"role": "user", "content": text}],
+        logger.info("Summarising with Gemini...")
+        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            system_instruction=_SUMMARY_SYSTEM,
         )
-        return msg.content[0].text
+        response = model.generate_content(text)
+        return response.text
 
     def build_email(self, summary_html: str, data: Dict, date_str: str) -> str:
         indices_section   = _returns_table(data["indices"],    "📈 Market Indices")
