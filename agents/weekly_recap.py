@@ -16,8 +16,7 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from google import genai
-from google.genai import types
+from groq import Groq
 import pytz
 import requests
 from bs4 import BeautifulSoup
@@ -188,14 +187,17 @@ class WeeklyRecapAgent:
         return "\n".join(lines)
 
     def summarise(self, text: str) -> str:
-        logger.info("Summarising with Gemini...")
-        client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-lite",
-            config=types.GenerateContentConfig(system_instruction=_SUMMARY_SYSTEM),
-            contents=text,
+        logger.info("Summarising with Groq (Llama 3.3 70B)...")
+        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": _SUMMARY_SYSTEM},
+                {"role": "user",   "content": text},
+            ],
+            max_tokens=1500,
         )
-        return response.text
+        return response.choices[0].message.content
 
     def build_email(self, summary_html: str, data: Dict, date_str: str) -> str:
         indices_section   = _returns_table(data["indices"],    "📈 Market Indices")
