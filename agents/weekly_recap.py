@@ -191,7 +191,7 @@ class WeeklyRecapAgent:
         logger.info("Summarising with Gemini...")
         client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-1.5-flash",
             config=types.GenerateContentConfig(system_instruction=_SUMMARY_SYSTEM),
             contents=text,
         )
