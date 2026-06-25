@@ -120,10 +120,10 @@ def _yields_table(us_yields, sovereign, spreads, spread_10y_2y, lqd_hyg) -> str:
         f'<thead><tr>'
         f'<th style="{_TH_L}">Instrument</th>'
         f'<th style="{_TH}">Yield (%)</th>'
-        f'<th style="{_TH}">1W Δ (bps)</th>'
+        f'<th style="{_TH}">Δ (bps)</th>'
         f'</tr></thead><tbody>'
     )
-    for name, d in us_yields + sovereign:
+    for name, d in us_yields:
         if d:
             html += (
                 f'<tr><td style="{_TD_L}">{name}</td>'
@@ -132,7 +132,18 @@ def _yields_table(us_yields, sovereign, spreads, spread_10y_2y, lqd_hyg) -> str:
             )
         else:
             html += f'<tr><td style="{_TD_L}">{name}</td><td style="{_TD}" colspan="2">—</td></tr>'
-    html += "</tbody></table>"
+    for name, d in sovereign:
+        label = f'{name} <span style="font-size:10px;color:#cbd5e1">†</span>'
+        if d:
+            html += (
+                f'<tr><td style="{_TD_L}">{label}</td>'
+                f'<td style="{_TD}">{d["value"]:.2f}%</td>'
+                f'<td style="{_TD}">{_bps(d["weekly_bps"])}</td></tr>'
+            )
+        else:
+            html += f'<tr><td style="{_TD_L}">{label}</td><td style="{_TD}" colspan="2">—</td></tr>'
+    html += '</tbody></table>'
+    html += '<p style="font-size:10px;color:#9ca3af;margin:2px 0 10px">† Monthly FRED data — Δ is month-over-month</p>'
 
     # Derived metrics
     html += (
@@ -158,10 +169,17 @@ def _yields_table(us_yields, sovereign, spreads, spread_10y_2y, lqd_hyg) -> str:
                 f'<td style="{_TD}">{_bps(d["weekly_bps"])}</td></tr>'
             )
     if lqd_hyg:
+        wc = lqd_hyg["weekly_change"]
+        if wc is not None:
+            sign = "+" if wc >= 0 else ""
+            wc_color = _GREEN if wc > 0 else (_RED if wc < 0 else _GRAY)
+            wc_html = f'<span style="color:{wc_color};font-weight:600">{sign}{wc:.4f}</span>'
+        else:
+            wc_html = '<span style="color:#9ca3af">—</span>'
         html += (
             f'<tr><td style="{_TD_L}">LQD/HYG Ratio</td>'
-            f'<td style="{_TD}">{lqd_hyg:.4f}</td>'
-            f'<td style="{_TD}"><span style="color:#9ca3af">—</span></td></tr>'
+            f'<td style="{_TD}">{lqd_hyg["ratio"]:.4f}</td>'
+            f'<td style="{_TD}">{wc_html}</td></tr>'
         )
     html += "</tbody></table>"
     return html

@@ -69,7 +69,9 @@ def _returns(ticker: str) -> Optional[Dict]:
         hist = yf.Ticker(ticker).history(period="ytd", auto_adjust=True)
         if hist.empty or len(hist) < 2:
             return None
-        closes = hist["Close"]
+        closes = hist["Close"].dropna()
+        if len(closes) < 2:
+            return None
         last = float(closes.iloc[-1])
 
         week_base = float(closes.iloc[max(0, len(closes) - 6)])
@@ -112,7 +114,13 @@ def _fred(series_id: str, api_key: str, monthly: bool = False) -> Optional[Dict]
         if not obs:
             return None
         latest = obs[0][1]
-        if monthly or len(obs) < 6:
+        if monthly:
+            prev = obs[1][1] if len(obs) > 1 else None
+            return {
+                "value": round(latest, 2),
+                "weekly_bps": round((latest - prev) * 100, 1) if prev is not None else None,
+            }
+        if len(obs) < 6:
             return {"value": round(latest, 2), "weekly_bps": None}
         week_ago = obs[min(5, len(obs) - 1)][1]
         return {
@@ -154,10 +162,20 @@ def fetch_all(fred_api_key: str) -> Dict:
     else:
         spread_10y_2y = None
 
-    # Derived: LQD / HYG ratio
+    # Derived: LQD / HYG ratio with weekly change
     lqd_d = next((d for n, d in bond_etfs if "LQD" in n), None)
     hyg_d = next((d for n, d in bond_etfs if "HYG" in n), None)
-    lqd_hyg = round(lqd_d["last"] / hyg_d["last"], 4) if lqd_d and hyg_d else None
+    if lqd_d and hyg_d:
+        try:
+            lqd_c = yf.Ticker("LQD").history(period="ytd", auto_adjust=True)["Close"].dropna()
+            hyg_c = yf.Ticker("HYG").history(period="ytd", auto_adjust=True)["Close"].dropna()
+            ratio_now  = float(lqd_c.iloc[-1]) / float(hyg_c.iloc[-1])
+            ratio_week = float(lqd_c.iloc[max(0, len(lqd_c) - 6)]) / float(hyg_c.iloc[max(0, len(hyg_c) - 6)])
+            lqd_hyg = {"ratio": round(ratio_now, 4), "weekly_change": round(ratio_now - ratio_week, 4)}
+        except Exception:
+            lqd_hyg = {"ratio": round(lqd_d["last"] / hyg_d["last"], 4), "weekly_change": None}
+    else:
+        lqd_hyg = None
 
     return {
         "indices":        indices,
