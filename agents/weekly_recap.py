@@ -8,6 +8,7 @@ Every Friday at 11:59 AM SGT:
 """
 import logging
 import os
+import re
 import smtplib
 import sys
 from datetime import datetime
@@ -111,7 +112,7 @@ def _returns_table(rows: List[Tuple[str, Optional[Dict]]], title: str) -> str:
 
 
 _SIGNAL_DESCRIPTIONS = {
-    "RVX / VIX": "idiosyncratic risk",
+    "VXN / VIX": "Nasdaq vs broad market vol",
     "RSP / SPY":  "market breadth",
     "IWD / IWF":  "value vs growth",
 }
@@ -245,7 +246,11 @@ class WeeklyRecapAgent:
             ],
             max_tokens=1500,
         )
-        return response.choices[0].message.content
+        text = response.choices[0].message.content
+        # LLMs often output markdown even when prompted for HTML — convert to HTML
+        text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text, flags=re.DOTALL)
+        text = re.sub(r'\*(.+?)\*',     r'<em>\1</em>', text, flags=re.DOTALL)
+        return text
 
     def build_email(self, summary_html: str, data: Dict, date_str: str) -> str:
         indices_section   = _returns_table(data["indices"],    "📈 Market Indices")

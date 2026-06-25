@@ -51,7 +51,7 @@ CURRENCIES: List[Tuple[str, str]] = [
 ]
 
 SIGNAL_RATIOS: List[Tuple[str, str, str]] = [
-    ("RVX / VIX", "^RVX", "^VIX"),
+    ("VXN / VIX", "^VXN", "^VIX"),
     ("RSP / SPY", "RSP",  "SPY"),
     ("IWD / IWF", "IWD",  "IWF"),
 ]
