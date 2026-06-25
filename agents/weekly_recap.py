@@ -184,8 +184,9 @@ def _yields_table(us_yields, sovereign, spreads, spread_10y_2y, lqd_hyg, signals
             wc_html = f'<span style="color:{wc_color};font-weight:600">{sign}{wc:.4f}</span>'
         else:
             wc_html = '<span style="color:#9ca3af">—</span>'
+        lqd_hyg_label = f'LQD/HYG Ratio <span style="font-size:10px;color:#9ca3af">(canary, risk on/off)</span>'
         html += (
-            f'<tr><td style="{_TD_L}">LQD/HYG Ratio</td>'
+            f'<tr><td style="{_TD_L}">{lqd_hyg_label}</td>'
             f'<td style="{_TD}">{lqd_hyg["ratio"]:.4f}</td>'
             f'<td style="{_TD}">{wc_html}</td></tr>'
         )
