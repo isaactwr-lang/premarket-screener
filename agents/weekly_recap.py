@@ -110,6 +110,49 @@ def _returns_table(rows: List[Tuple[str, Optional[Dict]]], title: str) -> str:
     return header + body + "</tbody></table>"
 
 
+_SIGNAL_DESCRIPTIONS = {
+    "SPY / VIX": "risk appetite",
+    "RSP / SPY":  "market breadth",
+    "IWD / IWF":  "value vs growth",
+}
+
+
+def _signals_table(rows: List[Tuple[str, Optional[Dict]]]) -> str:
+    header = (
+        '<h3 style="color:#1a3a5c;margin-top:24px">🔍 Market Signals</h3>'
+        '<table style="border-collapse:collapse;width:100%;font-size:13px">'
+        f'<thead><tr>'
+        f'<th style="{_TH_L}">Signal</th>'
+        f'<th style="{_TH}">Level</th>'
+        f'<th style="{_TH}">1W Δ</th>'
+        f'</tr></thead><tbody>'
+    )
+    body = ""
+    for name, d in rows:
+        desc = _SIGNAL_DESCRIPTIONS.get(name, "")
+        label = (f'{name} <span style="font-size:10px;color:#9ca3af">({desc})</span>'
+                 if desc else name)
+        if d:
+            wc = d["weekly_change"]
+            if wc is not None:
+                sign = "+" if wc >= 0 else ""
+                wc_color = _GREEN if wc > 0 else (_RED if wc < 0 else _GRAY)
+                wc_html = f'<span style="color:{wc_color};font-weight:600">{sign}{wc:.4f}</span>'
+            else:
+                wc_html = '<span style="color:#9ca3af">—</span>'
+            body += (
+                f'<tr><td style="{_TD_L}">{label}</td>'
+                f'<td style="{_TD}">{d["ratio"]:.4f}</td>'
+                f'<td style="{_TD}">{wc_html}</td></tr>'
+            )
+        else:
+            body += (
+                f'<tr><td style="{_TD_L}">{label}</td>'
+                f'<td style="{_TD}" colspan="2"><span style="color:#9ca3af">data unavailable</span></td></tr>'
+            )
+    return header + body + "</tbody></table>"
+
+
 def _yields_table(us_yields, sovereign, spreads, spread_10y_2y, lqd_hyg) -> str:
     html = '<h3 style="color:#1a3a5c;margin-top:24px">💵 Fixed Income</h3>'
 
@@ -225,6 +268,7 @@ class WeeklyRecapAgent:
             data["spread_10y_2y"], data["lqd_hyg_ratio"],
         ) + bond_etf_section
         fx_section        = _returns_table(data["currencies"], "💱 Currencies")
+        signals_section   = _signals_table(data["signals"])
 
         return f"""<html>
 <body style="font-family:Arial,sans-serif;max-width:720px;margin:auto;color:#222;line-height:1.6;">
@@ -244,6 +288,7 @@ class WeeklyRecapAgent:
     {indices_section}
     {fi_section}
     {fx_section}
+    {signals_section}
 
     <hr style="margin-top:32px;border:none;border-top:1px solid #e5e7eb;">
     <p style="font-size:11px;color:#9ca3af;">

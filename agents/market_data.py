@@ -29,6 +29,9 @@ INDICES: List[Tuple[str, str]] = [
     ("CSI 300",        "000300.SS"),
     ("Straits Times",  "^STI"),
     ("ILF",            "ILF"),
+    ("VIX",            "^VIX"),
+    ("Copper",         "HG=F"),
+    ("WTI Crude",      "CL=F"),
 ]
 
 BOND_ETFS: List[Tuple[str, str]] = [
@@ -42,7 +45,15 @@ CURRENCIES: List[Tuple[str, str]] = [
     ("EUR/USD", "EURUSD=X"),
     ("USD/JPY", "USDJPY=X"),
     ("BTC/USD", "BTC-USD"),
+    ("ETH/USD", "ETH-USD"),
     ("XAU/USD", "GC=F"),
+    ("XAG/USD", "SI=F"),
+]
+
+SIGNAL_RATIOS: List[Tuple[str, str, str]] = [
+    ("SPY / VIX", "SPY",  "^VIX"),
+    ("RSP / SPY", "RSP",  "SPY"),
+    ("IWD / IWF", "IWD",  "IWF"),
 ]
 
 # Daily FRED series (US yields + spreads)
@@ -87,6 +98,22 @@ def _returns(ticker: str) -> Optional[Dict]:
         return {"last": last, "weekly": weekly, "mtd": mtd, "ytd": ytd}
     except Exception as e:
         logger.warning(f"yfinance [{ticker}]: {e}")
+        return None
+
+# ── Ratio helpers ─────────────────────────────────────────────────────────
+
+def _ratio(t1: str, t2: str) -> Optional[Dict]:
+    """Return current ratio of two tickers plus its weekly change."""
+    try:
+        h1 = yf.Ticker(t1).history(period="ytd", auto_adjust=True)["Close"].dropna()
+        h2 = yf.Ticker(t2).history(period="ytd", auto_adjust=True)["Close"].dropna()
+        if len(h1) < 2 or len(h2) < 2:
+            return None
+        ratio_now  = float(h1.iloc[-1])  / float(h2.iloc[-1])
+        ratio_week = float(h1.iloc[max(0, len(h1) - 6)]) / float(h2.iloc[max(0, len(h2) - 6)])
+        return {"ratio": round(ratio_now, 4), "weekly_change": round(ratio_now - ratio_week, 4)}
+    except Exception as e:
+        logger.warning(f"ratio [{t1}/{t2}]: {e}")
         return None
 
 # ── FRED helpers ───────────────────────────────────────────────────────────
@@ -162,20 +189,9 @@ def fetch_all(fred_api_key: str) -> Dict:
     else:
         spread_10y_2y = None
 
-    # Derived: LQD / HYG ratio with weekly change
-    lqd_d = next((d for n, d in bond_etfs if "LQD" in n), None)
-    hyg_d = next((d for n, d in bond_etfs if "HYG" in n), None)
-    if lqd_d and hyg_d:
-        try:
-            lqd_c = yf.Ticker("LQD").history(period="ytd", auto_adjust=True)["Close"].dropna()
-            hyg_c = yf.Ticker("HYG").history(period="ytd", auto_adjust=True)["Close"].dropna()
-            ratio_now  = float(lqd_c.iloc[-1]) / float(hyg_c.iloc[-1])
-            ratio_week = float(lqd_c.iloc[max(0, len(lqd_c) - 6)]) / float(hyg_c.iloc[max(0, len(hyg_c) - 6)])
-            lqd_hyg = {"ratio": round(ratio_now, 4), "weekly_change": round(ratio_now - ratio_week, 4)}
-        except Exception:
-            lqd_hyg = {"ratio": round(lqd_d["last"] / hyg_d["last"], 4), "weekly_change": None}
-    else:
-        lqd_hyg = None
+    # Derived: LQD / HYG ratio + signal ratios
+    lqd_hyg = _ratio("LQD", "HYG")
+    signals  = [(name, _ratio(t1, t2)) for name, t1, t2 in SIGNAL_RATIOS]
 
     return {
         "indices":        indices,
@@ -186,4 +202,5 @@ def fetch_all(fred_api_key: str) -> Dict:
         "spreads":        spreads,
         "spread_10y_2y":  spread_10y_2y,
         "lqd_hyg_ratio":  lqd_hyg,
+        "signals":        signals,
     }
