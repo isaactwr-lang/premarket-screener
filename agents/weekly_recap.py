@@ -118,7 +118,7 @@ _SIGNAL_DESCRIPTIONS = {
 }
 
 
-def _yields_table(us_yields, sovereign, spreads, spread_10y_2y, lqd_hyg, signals=None) -> str:
+def _yields_table(us_yields, sovereign, spreads, spread_10y_2y, lqd_hyg, signals=None, vix=None) -> str:
     html = '<h3 style="color:#1a3a5c;margin-top:24px">💵 Fixed Income</h3>'
 
     # US yields + sovereign rates
@@ -163,6 +163,16 @@ def _yields_table(us_yields, sovereign, spreads, spread_10y_2y, lqd_hyg, signals
         f'<th style="{_TH}">1W Δ</th>'
         f'</tr></thead><tbody>'
     )
+    if vix:
+        wc = vix["weekly_change"]
+        sign = "+" if wc >= 0 else ""
+        wc_color = _GREEN if wc < 0 else (_RED if wc > 0 else _GRAY)
+        wc_html = f'<span style="color:{wc_color};font-weight:600">{sign}{wc:.2f} pts</span>'
+        html += (
+            f'<tr><td style="{_TD_L}">VIX <span style="font-size:10px;color:#9ca3af">(fear gauge)</span></td>'
+            f'<td style="{_TD}">{vix["value"]:.2f}</td>'
+            f'<td style="{_TD}">{wc_html}</td></tr>'
+        )
     if spread_10y_2y:
         html += (
             f'<tr><td style="{_TD_L}">10Y–2Y Spread</td>'
@@ -260,6 +270,7 @@ class WeeklyRecapAgent:
             data["us_yields"], data["sovereign"], data["spreads"],
             data["spread_10y_2y"], data["lqd_hyg_ratio"],
             signals=data["signals"],
+            vix=data.get("vix"),
         ) + bond_etf_section
         fx_section        = _returns_table(data["currencies"], "💱 Currencies")
 

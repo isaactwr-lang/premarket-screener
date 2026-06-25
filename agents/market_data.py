@@ -193,6 +193,15 @@ def fetch_all(fred_api_key: str) -> Dict:
     lqd_hyg = _ratio("LQD", "HYG")
     signals  = [(name, _ratio(t1, t2)) for name, t1, t2 in SIGNAL_RATIOS]
 
+    # VIX level + weekly point change (absolute, not %)
+    try:
+        vix_hist = yf.Ticker("^VIX").history(period="ytd", auto_adjust=True)["Close"].dropna()
+        vix_now  = float(vix_hist.iloc[-1])
+        vix_week = float(vix_hist.iloc[max(0, len(vix_hist) - 6)])
+        vix_data = {"value": round(vix_now, 2), "weekly_change": round(vix_now - vix_week, 2)}
+    except Exception:
+        vix_data = None
+
     return {
         "indices":        indices,
         "bond_etfs":      bond_etfs,
@@ -203,4 +212,5 @@ def fetch_all(fred_api_key: str) -> Dict:
         "spread_10y_2y":  spread_10y_2y,
         "lqd_hyg_ratio":  lqd_hyg,
         "signals":        signals,
+        "vix":            vix_data,
     }
