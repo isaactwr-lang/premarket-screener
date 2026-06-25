@@ -111,7 +111,7 @@ def _returns_table(rows: List[Tuple[str, Optional[Dict]]], title: str) -> str:
 
 
 _SIGNAL_DESCRIPTIONS = {
-    "SPY / VIX": "risk appetite",
+    "RVX / VIX": "idiosyncratic risk",
     "RSP / SPY":  "market breadth",
     "IWD / IWF":  "value vs growth",
 }
