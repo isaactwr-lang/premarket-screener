@@ -111,6 +111,15 @@ def _returns_table(rows: List[Tuple[str, Optional[Dict]]], title: str) -> str:
     return header + body + "</tbody></table>"
 
 
+_COUNTRY_FLAGS = {
+    "united states": "🇺🇸", "us": "🇺🇸",
+    "euro zone": "🇪🇺", "european union": "🇪🇺", "eu": "🇪🇺", "europe": "🇪🇺",
+    "germany": "🇩🇪", "france": "🇫🇷",
+    "japan": "🇯🇵", "jp": "🇯🇵",
+    "china": "🇨🇳", "cn": "🇨🇳",
+    "singapore": "🇸🇬", "sg": "🇸🇬",
+}
+
 _SIGNAL_DESCRIPTIONS = {
     "VXN / VIX": "Nasdaq vs broad market vol",
     "RSP / SPY":  "market breadth",
@@ -227,6 +236,60 @@ def _yields_table(us_yields, sovereign, spreads, spread_10y_2y, lqd_hyg, signals
     return html
 
 
+def _calendar_section(this_week: List[Dict], next_week: List[Dict]) -> str:
+
+    def _table(events: List[Dict], title: str, show_actual: bool) -> str:
+        t = f'<p style="font-weight:600;margin:12px 0 4px">{title}</p>'
+        if not events:
+            return t + '<p style="font-size:13px;color:#9ca3af">No high-impact events.</p>'
+        t += (
+            '<table style="border-collapse:collapse;width:100%;font-size:13px">'
+            f'<thead><tr>'
+            f'<th style="{_TH_L}">Date</th>'
+            f'<th style="{_TH_L}">Country</th>'
+            f'<th style="{_TH_L}">Event</th>'
+        )
+        if show_actual:
+            t += f'<th style="{_TH}">Actual</th>'
+        t += (
+            f'<th style="{_TH}">Forecast</th>'
+            f'<th style="{_TH}">Previous</th>'
+            f'</tr></thead><tbody>'
+        )
+        for e in events:
+            try:
+                dt = datetime.fromisoformat(e["time"].replace("Z", "+00:00"))
+                date_str = dt.strftime("%a %b %d")
+            except Exception:
+                date_str = e.get("time", "")[:10]
+            country    = e.get("country", "")
+            flag       = _COUNTRY_FLAGS.get(country.lower(), "🌐")
+            actual     = e.get("actual")  or "—"
+            forecast   = e.get("estimate") or "—"
+            prev       = e.get("prev")    or "—"
+            t += (
+                f'<tr>'
+                f'<td style="{_TD_L}">{date_str}</td>'
+                f'<td style="{_TD_L}">{flag} {country.title()}</td>'
+                f'<td style="{_TD_L}">{e.get("event", "")}</td>'
+            )
+            if show_actual:
+                t += f'<td style="{_TD}">{actual}</td>'
+            t += (
+                f'<td style="{_TD}">{forecast}</td>'
+                f'<td style="{_TD}">{prev}</td>'
+                f'</tr>'
+            )
+        t += '</tbody></table>'
+        return t
+
+    html  = '<h3 style="color:#1a3a5c;margin-top:24px">📅 Economic Calendar</h3>'
+    html += _table(this_week,  "This Week's Key Events",  show_actual=True)
+    html += _table(next_week,  "Next Week's Key Events",  show_actual=False)
+    html += '<p style="font-size:10px;color:#9ca3af;margin:4px 0 0">High-impact events only · US, EU, JP, CN, SG · Data via Finnhub</p>'
+    return html
+
+
 # ── Core agent ─────────────────────────────────────────────────────────────
 
 class WeeklyRecapAgent:
@@ -273,6 +336,9 @@ class WeeklyRecapAgent:
             vix=data.get("vix"),
         ) + bond_etf_section
         fx_section        = _returns_table(data["currencies"], "💱 Currencies")
+        cal_section       = _calendar_section(
+            data["calendar"]["this_week"], data["calendar"]["next_week"]
+        )
 
         return f"""<html>
 <body style="font-family:Arial,sans-serif;max-width:720px;margin:auto;color:#222;line-height:1.6;">
@@ -292,6 +358,7 @@ class WeeklyRecapAgent:
     {indices_section}
     {fi_section}
     {fx_section}
+    {cal_section}
 
     <hr style="margin-top:32px;border:none;border-top:1px solid #e5e7eb;">
     <p style="font-size:11px;color:#9ca3af;">
@@ -334,8 +401,9 @@ class WeeklyRecapAgent:
         article_text = self.fetch_article()
         summary_html = self.summarise(article_text)
 
-        fred_key = os.getenv("FRED_API_KEY", "")
-        data     = fetch_all(fred_key)
+        fred_key    = os.getenv("FRED_API_KEY", "")
+        finnhub_key = os.getenv("FINNHUB_API_KEY", "")
+        data        = fetch_all(fred_key, finnhub_key)
 
         email_html = self.build_email(summary_html, data, date_str)
         self.send_email(subject, email_html)
