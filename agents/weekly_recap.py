@@ -129,44 +129,9 @@ _SIGNAL_DESCRIPTIONS = {
 }
 
 
-def _yields_table(us_yields, sovereign, spreads, spread_10y_2y, lqd_hyg, signals=None, vix=None) -> str:
-    html = '<h3 style="color:#1a3a5c;margin-top:24px">💵 Fixed Income</h3>'
-
-    # US yields + sovereign rates
-    html += (
-        '<p style="font-weight:600;margin:12px 0 4px">Rates</p>'
-        '<table style="border-collapse:collapse;width:100%;font-size:13px">'
-        f'<thead><tr>'
-        f'<th style="{_TH_L}">Instrument</th>'
-        f'<th style="{_TH}">Yield (%)</th>'
-        f'<th style="{_TH}">Δ (bps)</th>'
-        f'</tr></thead><tbody>'
-    )
-    for name, d in us_yields:
-        if d:
-            html += (
-                f'<tr><td style="{_TD_L}">{name}</td>'
-                f'<td style="{_TD}">{d["value"]:.2f}%</td>'
-                f'<td style="{_TD}">{_bps(d["weekly_bps"])}</td></tr>'
-            )
-        else:
-            html += f'<tr><td style="{_TD_L}">{name}</td><td style="{_TD}" colspan="2">—</td></tr>'
-    for name, d in sovereign:
-        label = f'{name} <span style="font-size:10px;color:#cbd5e1">†</span>'
-        if d:
-            html += (
-                f'<tr><td style="{_TD_L}">{label}</td>'
-                f'<td style="{_TD}">{d["value"]:.2f}%</td>'
-                f'<td style="{_TD}">{_bps(d["weekly_bps"])}</td></tr>'
-            )
-        else:
-            html += f'<tr><td style="{_TD_L}">{label}</td><td style="{_TD}" colspan="2">—</td></tr>'
-    html += '</tbody></table>'
-    html += '<p style="font-size:10px;color:#9ca3af;margin:2px 0 10px">† Monthly FRED data — Δ is month-over-month</p>'
-
-    # Market Signals (derived metrics + ratio signals)
-    html += (
-        '<p style="font-weight:600;margin:16px 0 4px">Market Signals</p>'
+def _snapshot_signals_section(vix, spread_10y_2y, spreads, lqd_hyg, signals) -> str:
+    html = (
+        '<h3 style="color:#1a3a5c;margin-top:24px">🔍 Snapshot Signals</h3>'
         '<table style="border-collapse:collapse;width:100%;font-size:13px">'
         f'<thead><tr>'
         f'<th style="{_TH_L}">Metric</th>'
@@ -235,6 +200,41 @@ def _yields_table(us_yields, sovereign, spreads, spread_10y_2y, lqd_hyg, signals
                     f'<td style="{_TD}" colspan="2"><span style="color:#9ca3af">data unavailable</span></td></tr>'
                 )
     html += "</tbody></table>"
+    return html
+
+
+def _yields_table(us_yields, sovereign) -> str:
+    html = '<h3 style="color:#1a3a5c;margin-top:24px">💵 Fixed Income</h3>'
+    html += (
+        '<p style="font-weight:600;margin:12px 0 4px">Rates</p>'
+        '<table style="border-collapse:collapse;width:100%;font-size:13px">'
+        f'<thead><tr>'
+        f'<th style="{_TH_L}">Instrument</th>'
+        f'<th style="{_TH}">Yield (%)</th>'
+        f'<th style="{_TH}">Δ (bps)</th>'
+        f'</tr></thead><tbody>'
+    )
+    for name, d in us_yields:
+        if d:
+            html += (
+                f'<tr><td style="{_TD_L}">{name}</td>'
+                f'<td style="{_TD}">{d["value"]:.2f}%</td>'
+                f'<td style="{_TD}">{_bps(d["weekly_bps"])}</td></tr>'
+            )
+        else:
+            html += f'<tr><td style="{_TD_L}">{name}</td><td style="{_TD}" colspan="2">—</td></tr>'
+    for name, d in sovereign:
+        label = f'{name} <span style="font-size:10px;color:#cbd5e1">†</span>'
+        if d:
+            html += (
+                f'<tr><td style="{_TD_L}">{label}</td>'
+                f'<td style="{_TD}">{d["value"]:.2f}%</td>'
+                f'<td style="{_TD}">{_bps(d["weekly_bps"])}</td></tr>'
+            )
+        else:
+            html += f'<tr><td style="{_TD_L}">{label}</td><td style="{_TD}" colspan="2">—</td></tr>'
+    html += '</tbody></table>'
+    html += '<p style="font-size:10px;color:#9ca3af;margin:2px 0 10px">† Monthly FRED data — Δ is month-over-month</p>'
     return html
 
 
@@ -330,18 +330,17 @@ class WeeklyRecapAgent:
         return text
 
     def build_email(self, summary_html: str, data: Dict, date_str: str) -> str:
+        snapshot_section   = _snapshot_signals_section(
+            data.get("vix"), data["spread_10y_2y"], data["spreads"],
+            data["lqd_hyg_ratio"], data["signals"],
+        )
         indices_section    = _returns_table(data["indices"],     "📈 Global Equity Indices")
-        commodities_section= _returns_table(data["commodities"], "🛢️ Commodities")
+        sectors_section    = _returns_table(data["sectors"],     "🏭 S&P 500 Sectors (GICS)")
         bond_etf_section   = _returns_table(data["bond_etfs"],   "Bond ETFs")
-        fi_section         = _yields_table(
-            data["us_yields"], data["sovereign"], data["spreads"],
-            data["spread_10y_2y"], data["lqd_hyg_ratio"],
-            signals=data["signals"],
-            vix=data.get("vix"),
-        ) + bond_etf_section
-        fx_section         = _returns_table(data["fx"],      "💱 FX")
-        crypto_section     = _returns_table(data["crypto"],  "🪙 Crypto")
-        sectors_section    = _returns_table(data["sectors"], "🏭 S&P 500 Sectors (GICS)")
+        fi_section         = _yields_table(data["us_yields"], data["sovereign"]) + bond_etf_section
+        commodities_section= _returns_table(data["commodities"], "🛢️ Commodities")
+        fx_section         = _returns_table(data["fx"],          "💱 FX")
+        crypto_section     = _returns_table(data["crypto"],      "🪙 Crypto")
         cal_section        = _calendar_section(
             data["calendar"]["this_week"], data["calendar"]["next_week"]
         )
@@ -361,12 +360,13 @@ class WeeklyRecapAgent:
       {summary_html}
     </div>
 
+    {snapshot_section}
     {indices_section}
-    {commodities_section}
+    {sectors_section}
     {fi_section}
+    {commodities_section}
     {fx_section}
     {crypto_section}
-    {sectors_section}
     {cal_section}
 
     <hr style="margin-top:32px;border:none;border-top:1px solid #e5e7eb;">
