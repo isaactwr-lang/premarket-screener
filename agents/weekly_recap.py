@@ -76,7 +76,7 @@ def _price(val: Optional[float]) -> str:
         return "—"
     if val >= 10_000:
         return f"{val:,.0f}"
-    if val >= 100:
+    if val >= 10:
         return f"{val:,.2f}"
     return f"{val:.4f}"
 
@@ -106,7 +106,7 @@ def _returns_table(rows: List[Tuple[str, Optional[Dict]]], title: str) -> str:
         else:
             body += (
                 f'<tr><td style="{_TD_L}">{name}</td>'
-                + f'<td style="{_TD}" colspan="4" style="color:#9ca3af">data unavailable</td></tr>'
+                f'<td style="{_TD}color:#9ca3af;" colspan="4">data unavailable</td></tr>'
             )
     return header + body + "</tbody></table>"
 
@@ -150,10 +150,17 @@ def _snapshot_signals_section(vix, spread_10y_2y, spreads, lqd_hyg, signals) -> 
             f'<td style="{_TD}">{wc_html}</td></tr>'
         )
     if spread_10y_2y:
+        wc_10y2y = spread_10y_2y["weekly_bps"]
+        if wc_10y2y is None:
+            wc_10y2y_html = '<span style="color:#9ca3af">—</span>'
+        else:
+            sign = "+" if wc_10y2y >= 0 else ""
+            color = _GREEN if wc_10y2y > 0 else (_RED if wc_10y2y < 0 else _GRAY)
+            wc_10y2y_html = f'<span style="color:{color};font-weight:600">{sign}{wc_10y2y:.1f} bps</span>'
         html += (
             f'<tr><td style="{_TD_L}">10Y–2Y Spread</td>'
             f'<td style="{_TD}">{spread_10y_2y["value"]} bps</td>'
-            f'<td style="{_TD}">{_bps(spread_10y_2y["weekly_bps"])}</td></tr>'
+            f'<td style="{_TD}">{wc_10y2y_html}</td></tr>'
         )
     for name, d in spreads:
         if d:
