@@ -159,7 +159,7 @@ def _snapshot_signals_section(vix, spread_10y_2y, spreads, lqd_hyg, signals) -> 
         if d:
             html += (
                 f'<tr><td style="{_TD_L}">{name}</td>'
-                f'<td style="{_TD}">{d["value"]:.0f} bps</td>'
+                f'<td style="{_TD}">{d["value"] * 100:.0f} bps</td>'
                 f'<td style="{_TD}">{_bps(d["weekly_bps"])}</td></tr>'
             )
     if lqd_hyg:
