@@ -112,12 +112,14 @@ def _returns_table(rows: List[Tuple[str, Optional[Dict]]], title: str) -> str:
 
 
 _COUNTRY_FLAGS = {
-    "united states": "🇺🇸", "us": "🇺🇸",
-    "euro zone": "🇪🇺", "european union": "🇪🇺", "eu": "🇪🇺", "europe": "🇪🇺",
-    "germany": "🇩🇪", "france": "🇫🇷",
-    "japan": "🇯🇵", "jp": "🇯🇵",
-    "china": "🇨🇳", "cn": "🇨🇳",
-    "singapore": "🇸🇬", "sg": "🇸🇬",
+    "US":  "🇺🇸", "EMU": "🇪🇺",
+    "JP":  "🇯🇵", "CN":  "🇨🇳",
+    "SG":  "🇸🇬",
+}
+_COUNTRY_NAMES = {
+    "US": "United States", "EMU": "Euro Area",
+    "JP": "Japan",         "CN":  "China",
+    "SG": "Singapore",
 }
 
 _SIGNAL_DESCRIPTIONS = {
@@ -258,20 +260,21 @@ def _calendar_section(this_week: List[Dict], next_week: List[Dict]) -> str:
         )
         for e in events:
             try:
-                dt = datetime.fromisoformat(e["time"].replace("Z", "+00:00"))
+                dt = datetime.fromisoformat(e["dateUtc"].replace("Z", "+00:00"))
                 date_str = dt.strftime("%a %b %d")
             except Exception:
-                date_str = e.get("time", "")[:10]
-            country    = e.get("country", "")
-            flag       = _COUNTRY_FLAGS.get(country.lower(), "🌐")
-            actual     = e.get("actual")  or "—"
-            forecast   = e.get("estimate") or "—"
-            prev       = e.get("prev")    or "—"
+                date_str = e.get("dateUtc", "")[:10]
+            code       = e.get("countryCode", "")
+            flag       = _COUNTRY_FLAGS.get(code, "🌐")
+            country    = _COUNTRY_NAMES.get(code, code)
+            actual     = e.get("actual")    or "—"
+            forecast   = e.get("consensus") or "—"
+            prev       = e.get("previous")  or "—"
             t += (
                 f'<tr>'
                 f'<td style="{_TD_L}">{date_str}</td>'
-                f'<td style="{_TD_L}">{flag} {country.title()}</td>'
-                f'<td style="{_TD_L}">{e.get("event", "")}</td>'
+                f'<td style="{_TD_L}">{flag} {country}</td>'
+                f'<td style="{_TD_L}">{e.get("name", "")}</td>'
             )
             if show_actual:
                 t += f'<td style="{_TD}">{actual}</td>'
@@ -286,7 +289,7 @@ def _calendar_section(this_week: List[Dict], next_week: List[Dict]) -> str:
     html  = '<h3 style="color:#1a3a5c;margin-top:24px">📅 Economic Calendar</h3>'
     html += _table(this_week,  "This Week's Key Events",  show_actual=True)
     html += _table(next_week,  "Next Week's Key Events",  show_actual=False)
-    html += '<p style="font-size:10px;color:#9ca3af;margin:4px 0 0">High-impact events only · US, EU, JP, CN, SG · Data via Finnhub</p>'
+    html += '<p style="font-size:10px;color:#9ca3af;margin:4px 0 0">High-impact events only · US, Euro Area, JP, CN, SG · Data via FXStreet</p>'
     return html
 
 
@@ -407,9 +410,8 @@ class WeeklyRecapAgent:
         article_text = self.fetch_article()
         summary_html = self.summarise(article_text)
 
-        fred_key    = os.getenv("FRED_API_KEY", "")
-        finnhub_key = os.getenv("FINNHUB_API_KEY", "")
-        data        = fetch_all(fred_key, finnhub_key)
+        fred_key = os.getenv("FRED_API_KEY", "")
+        data     = fetch_all(fred_key)
 
         email_html = self.build_email(summary_html, data, date_str)
         self.send_email(subject, email_html)

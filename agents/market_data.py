@@ -182,50 +182,47 @@ def _fred(series_id: str, api_key: str, monthly: bool = False) -> Optional[Dict]
         logger.warning(f"FRED [{series_id}]: {e}")
         return None
 
-# ── Economic calendar (Finnhub) ────────────────────────────────────────────
+# ── Economic calendar (FXStreet internal API — no key required) ────────────
 
-_CALENDAR_COUNTRIES = {
-    "united states", "us",
-    "euro zone", "european union", "eu", "europe",
-    "germany", "france",
-    "japan", "jp",
-    "china", "cn",
-    "singapore", "sg",
+_CALENDAR_COUNTRIES = {"US", "EMU", "JP", "CN", "SG"}
+_FXSTREET_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Origin":     "https://www.fxstreet.com",
+    "Accept":     "application/json",
 }
 
-def fetch_economic_calendar(api_key: str) -> Dict:
-    if not api_key:
-        return {"this_week": [], "next_week": []}
-    today = date.today()
+def fetch_economic_calendar() -> Dict:
+    today    = date.today()
     mon      = today - timedelta(days=today.weekday())
-    sun      = mon + timedelta(days=6)
-    next_mon = sun + timedelta(days=1)
-    next_sun = next_mon + timedelta(days=6)
+    next_sun = mon + timedelta(days=13)
+    next_mon = mon + timedelta(days=7)
 
-    def _fetch(from_d: date, to_d: date) -> List[Dict]:
-        try:
-            r = requests.get(
-                "https://finnhub.io/api/v1/calendar/economic",
-                params={"from": from_d.isoformat(), "to": to_d.isoformat(), "token": api_key},
-                timeout=15,
-            )
-            r.raise_for_status()
-            events = r.json().get("economicCalendar", [])
-            filtered = [
-                e for e in events
-                if e.get("impact", "").lower() == "high"
-                and e.get("country", "").lower() in _CALENDAR_COUNTRIES
-            ]
-            return sorted(filtered, key=lambda e: e.get("time", ""))
-        except Exception as e:
-            logger.warning(f"Finnhub calendar [{from_d}–{to_d}]: {e}")
-            return []
+    url = (
+        f"https://calendar-api.fxstreet.com/en/api/v1/eventDates"
+        f"/{mon.isoformat()}/{next_sun.isoformat()}"
+    )
+    try:
+        r = requests.get(url, headers=_FXSTREET_HEADERS, timeout=20)
+        r.raise_for_status()
+        events = r.json()
+    except Exception as e:
+        logger.warning(f"FXStreet calendar: {e}")
+        return {"this_week": [], "next_week": []}
 
-    return {"this_week": _fetch(mon, sun), "next_week": _fetch(next_mon, next_sun)}
+    high = [
+        e for e in events
+        if e.get("volatility") == "HIGH"
+        and e.get("countryCode") in _CALENDAR_COUNTRIES
+    ]
+    high.sort(key=lambda e: e.get("dateUtc", ""))
+
+    this_week = [e for e in high if e.get("dateUtc", "") <  next_mon.isoformat()]
+    next_week = [e for e in high if e.get("dateUtc", "") >= next_mon.isoformat()]
+    return {"this_week": this_week, "next_week": next_week}
 
 # ── Main entry point ───────────────────────────────────────────────────────
 
-def fetch_all(fred_api_key: str, finnhub_api_key: str = "") -> Dict:
+def fetch_all(fred_api_key: str) -> Dict:
     logger.info("Fetching market data (yfinance + FRED)...")
 
     indices     = [(n, _returns(t)) for n, t in INDICES]
@@ -266,7 +263,7 @@ def fetch_all(fred_api_key: str, finnhub_api_key: str = "") -> Dict:
     except Exception:
         vix_data = None
 
-    calendar = fetch_economic_calendar(finnhub_api_key)
+    calendar = fetch_economic_calendar()
 
     return {
         "indices":       indices,
