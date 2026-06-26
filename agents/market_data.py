@@ -24,14 +24,19 @@ INDICES: List[Tuple[str, str]] = [
     ("FTSE 100",       "^FTSE"),
     ("Nikkei 225",     "^N225"),
     ("KOSPI",          "^KS11"),
-    ("TSMC",           "TSM"),
+    ("Taiwan (TWII)",  "^TWII"),
     ("Hang Seng",      "^HSI"),
     ("CSI 300",        "000300.SS"),
     ("Straits Times",  "^STI"),
     ("ILF",            "ILF"),
-    ("VIX",            "^VIX"),
-    ("Copper",         "HG=F"),
-    ("WTI Crude",      "CL=F"),
+]
+
+COMMODITIES: List[Tuple[str, str]] = [
+    ("Gold (XAU)",    "GC=F"),
+    ("Silver (XAG)",  "SI=F"),
+    ("Copper",        "HG=F"),
+    ("WTI Crude",     "CL=F"),
+    ("Brent Crude",   "BZ=F"),
 ]
 
 BOND_ETFS: List[Tuple[str, str]] = [
@@ -40,14 +45,33 @@ BOND_ETFS: List[Tuple[str, str]] = [
     ("LQD (IG Corp)",      "LQD"),
 ]
 
-CURRENCIES: List[Tuple[str, str]] = [
+FX_PAIRS: List[Tuple[str, str]] = [
     ("USD/SGD", "USDSGD=X"),
     ("EUR/USD", "EURUSD=X"),
+    ("GBP/USD", "GBPUSD=X"),
+    ("AUD/USD", "AUDUSD=X"),
     ("USD/JPY", "USDJPY=X"),
+    ("USD/CNH", "USDCNH=X"),
+]
+
+CRYPTO: List[Tuple[str, str]] = [
     ("BTC/USD", "BTC-USD"),
     ("ETH/USD", "ETH-USD"),
-    ("XAU/USD", "GC=F"),
-    ("XAG/USD", "SI=F"),
+    ("SOL/USD", "SOL-USD"),
+]
+
+SECTORS: List[Tuple[str, str]] = [
+    ("Technology",       "XLK"),
+    ("Health Care",      "XLV"),
+    ("Financials",       "XLF"),
+    ("Consumer Disc.",   "XLY"),
+    ("Comm. Services",   "XLC"),
+    ("Industrials",      "XLI"),
+    ("Consumer Staples", "XLP"),
+    ("Energy",           "XLE"),
+    ("Utilities",        "XLU"),
+    ("Real Estate",      "XLRE"),
+    ("Materials",        "XLB"),
 ]
 
 SIGNAL_RATIOS: List[Tuple[str, str, str]] = [
@@ -65,7 +89,7 @@ FRED_DAILY: List[Tuple[str, str]] = [
     ("IG Spread",  "BAMLC0A0CM"),
 ]
 
-# Monthly FRED series (sovereign yields — show level only, no weekly Δ)
+# Monthly FRED series (sovereign yields)
 FRED_MONTHLY: List[Tuple[str, str]] = [
     ("German Bund 10Y", "IRLTLT01DEM156N"),
     ("UK Gilt 10Y",     "IRLTLT01GBM156N"),
@@ -204,18 +228,19 @@ def fetch_economic_calendar(api_key: str) -> Dict:
 def fetch_all(fred_api_key: str, finnhub_api_key: str = "") -> Dict:
     logger.info("Fetching market data (yfinance + FRED)...")
 
-    indices   = [(n, _returns(t))  for n, t in INDICES]
-    bond_etfs = [(n, _returns(t))  for n, t in BOND_ETFS]
-    currencies = [(n, _returns(t)) for n, t in CURRENCIES]
+    indices     = [(n, _returns(t)) for n, t in INDICES]
+    commodities = [(n, _returns(t)) for n, t in COMMODITIES]
+    bond_etfs   = [(n, _returns(t)) for n, t in BOND_ETFS]
+    fx          = [(n, _returns(t)) for n, t in FX_PAIRS]
+    crypto      = [(n, _returns(t)) for n, t in CRYPTO]
+    sectors     = [(n, _returns(t)) for n, t in SECTORS]
 
-    yields_daily   = [(n, _fred(s, fred_api_key))              for n, s in FRED_DAILY]
-    yields_monthly = [(n, _fred(s, fred_api_key, monthly=True)) for n, s in FRED_MONTHLY]
+    yields_daily   = [(n, _fred(s, fred_api_key))               for n, s in FRED_DAILY]
+    yields_monthly = [(n, _fred(s, fred_api_key, monthly=True))  for n, s in FRED_MONTHLY]
 
-    # Separate US yields from spreads
     us_yields = [(n, d) for n, d in yields_daily if "Spread" not in n]
     spreads   = [(n, d) for n, d in yields_daily if "Spread" in n]
 
-    # Derived: 10Y − 2Y
     d_2y  = next((d for n, d in us_yields if n == "US 2Y"),  None)
     d_10y = next((d for n, d in us_yields if n == "US 10Y"), None)
     if d_2y and d_10y:
@@ -230,11 +255,9 @@ def fetch_all(fred_api_key: str, finnhub_api_key: str = "") -> Dict:
     else:
         spread_10y_2y = None
 
-    # Derived: LQD / HYG ratio + signal ratios
     lqd_hyg = _ratio("LQD", "HYG")
     signals  = [(name, _ratio(t1, t2)) for name, t1, t2 in SIGNAL_RATIOS]
 
-    # VIX level + weekly point change (absolute, not %)
     try:
         vix_hist = yf.Ticker("^VIX").history(period="ytd", auto_adjust=True)["Close"].dropna()
         vix_now  = float(vix_hist.iloc[-1])
@@ -246,15 +269,18 @@ def fetch_all(fred_api_key: str, finnhub_api_key: str = "") -> Dict:
     calendar = fetch_economic_calendar(finnhub_api_key)
 
     return {
-        "indices":        indices,
-        "bond_etfs":      bond_etfs,
-        "currencies":     currencies,
-        "us_yields":      us_yields,
-        "sovereign":      yields_monthly,
-        "spreads":        spreads,
-        "spread_10y_2y":  spread_10y_2y,
-        "lqd_hyg_ratio":  lqd_hyg,
-        "signals":        signals,
-        "vix":            vix_data,
-        "calendar":       calendar,
+        "indices":       indices,
+        "commodities":   commodities,
+        "bond_etfs":     bond_etfs,
+        "fx":            fx,
+        "crypto":        crypto,
+        "sectors":       sectors,
+        "us_yields":     us_yields,
+        "sovereign":     yields_monthly,
+        "spreads":       spreads,
+        "spread_10y_2y": spread_10y_2y,
+        "lqd_hyg_ratio": lqd_hyg,
+        "signals":       signals,
+        "vix":           vix_data,
+        "calendar":      calendar,
     }

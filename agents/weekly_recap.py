@@ -327,16 +327,19 @@ class WeeklyRecapAgent:
         return text
 
     def build_email(self, summary_html: str, data: Dict, date_str: str) -> str:
-        indices_section   = _returns_table(data["indices"],    "📈 Market Indices")
-        bond_etf_section  = _returns_table(data["bond_etfs"], "Bond ETFs")
-        fi_section        = _yields_table(
+        indices_section    = _returns_table(data["indices"],     "📈 Global Equity Indices")
+        commodities_section= _returns_table(data["commodities"], "🛢️ Commodities")
+        bond_etf_section   = _returns_table(data["bond_etfs"],   "Bond ETFs")
+        fi_section         = _yields_table(
             data["us_yields"], data["sovereign"], data["spreads"],
             data["spread_10y_2y"], data["lqd_hyg_ratio"],
             signals=data["signals"],
             vix=data.get("vix"),
         ) + bond_etf_section
-        fx_section        = _returns_table(data["currencies"], "💱 Currencies")
-        cal_section       = _calendar_section(
+        fx_section         = _returns_table(data["fx"],      "💱 FX")
+        crypto_section     = _returns_table(data["crypto"],  "🪙 Crypto")
+        sectors_section    = _returns_table(data["sectors"], "🏭 S&P 500 Sectors (GICS)")
+        cal_section        = _calendar_section(
             data["calendar"]["this_week"], data["calendar"]["next_week"]
         )
 
@@ -356,8 +359,11 @@ class WeeklyRecapAgent:
     </div>
 
     {indices_section}
+    {commodities_section}
     {fi_section}
     {fx_section}
+    {crypto_section}
+    {sectors_section}
     {cal_section}
 
     <hr style="margin-top:32px;border:none;border-top:1px solid #e5e7eb;">
