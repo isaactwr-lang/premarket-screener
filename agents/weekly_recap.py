@@ -365,6 +365,9 @@ class WeeklyRecapAgent:
     <h3 style="color:#1a3a5c;margin-top:0">📝 Weekly Summary</h3>
     <div style="background:#fff;padding:16px;border-radius:4px;border:1px solid #e5e7eb;">
       {summary_html}
+      <p style="font-size:11px;color:#9ca3af;margin:12px 0 0">
+        Source: <a href="{SOURCE_URL}" style="color:#6b7280;">T. Rowe Price — Global Markets Weekly Update</a>
+      </p>
     </div>
 
     {snapshot_section}
