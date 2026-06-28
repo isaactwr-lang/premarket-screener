@@ -1,6 +1,8 @@
 name: Weekly Market Recap
 
 on:
+  schedule:
+    - cron: "0 1 * * 1"  # 9:00 AM SGT (UTC+8) every Monday
   workflow_dispatch:
 
 jobs:
