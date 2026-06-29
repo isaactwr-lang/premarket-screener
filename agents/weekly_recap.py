@@ -294,8 +294,8 @@ def _calendar_section(this_week: List[Dict], next_week: List[Dict]) -> str:
         return t
 
     html  = '<h3 style="color:#1a3a5c;margin-top:24px">📅 Economic Calendar</h3>'
-    html += _table(this_week,  "This Week's Key Events",  show_actual=True)
-    html += _table(next_week,  "Next Week's Key Events",  show_actual=False)
+    html += _table(this_week,  "Last Week's Key Events",  show_actual=True)
+    html += _table(next_week,  "This Week's Key Events",  show_actual=False)
     html += '<p style="font-size:10px;color:#9ca3af;margin:4px 0 0">High-impact events only · US, Euro Area, JP, CN, SG · Data via FXStreet</p>'
     return html
 
