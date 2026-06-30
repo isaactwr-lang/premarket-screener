@@ -2,8 +2,9 @@ name: Premarket Screener
 
 on:
   schedule:
-    # 8:30 AM ET (EDT = UTC-4) Monday–Friday
-    - cron: "30 12 * * 1-5"
+    # Target ~8:30 AM ET — scheduled 3h early to offset GitHub Actions queue delay (~2.5–4h)
+    # 9:30 UTC = 5:30 PM SGT → typically executes around 12:00–13:30 UTC (8:00–9:30 AM ET)
+    - cron: "30 9 * * 1-5"
   workflow_dispatch: # allow manual trigger from GitHub UI
 
 jobs:
